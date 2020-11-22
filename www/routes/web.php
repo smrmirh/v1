@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get("test",function(){
     //return \App\Http\Controllers\AgentController::getDepartmentId(3);
+    return "TEST";
 });
 
 
