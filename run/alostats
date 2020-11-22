@@ -1,0 +1,9 @@
+#!/usr/bin/php
+<?php
+
+while(true) {
+    $m = file_get_contents("http://localhost/stats-run");
+    sleep(3);
+    echo "Done : " . date("Y-m-d H:i:s") . "\n";
+
+}

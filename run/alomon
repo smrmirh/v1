@@ -1,0 +1,626 @@
+#!/usr/bin/php
+<?php
+include_once "/usr/share/alopad/www/config.php";
+
+$socket = @fsockopen(AST_HOST,AST_PORT, $errno, $errstr,10);
+
+if (!$socket) {
+    echo "$errstr ($errno)\n";
+}
+else {
+    fputs($socket, "Action: Login\r\n");
+    fputs($socket, "UserName: alopad_events\r\n");
+    fputs($socket, "Secret: alopad_events\r\n\r\n");
+    fputs($socket, "Action: WaitEvent\r\n");
+    fputs($socket, "Action: Logoff\r\n\r\n");
+
+    while(!feof($socket)){
+        $result=fread($socket,8192);
+        //echo $result;
+        $event = preg_split("/\r\n\r\n/",$result,-1,PREG_SPLIT_NO_EMPTY);
+		foreach($event as $eve) {
+
+		    $eventData = rawToArray($eve);
+
+		    //if ( preg_match("/wav/",$eve) )
+		    //    echo "\n------\n" . json_encode($eventData);
+		    if ( $eventData ) {
+		        if ( isset($eventData["Event"]) ) {
+		            //if ( $eventData["Event"] == "Newexten" ) continue;
+                    if ( $eventData["Event"] == "ExtensionStatus" ) continue;
+                    if ( $eventData["Event"] == "RTCPReceived" ) continue;
+                    if ( $eventData["Event"] == "RTCPSent" ) continue;
+                    if ( $eventData["Event"] == "VarSet" ) continue;
+		            //echo "[[[[ $eventData[Event] ]]]\n";
+		            $eventName = $eventData["Event"];
+		            $report = array();
+		            $report["Event"] = "NewEvent";
+		            $report["EventTime"] = time();
+		            switch($eventName) {
+
+                        case "Newexten" :
+
+                            if ( isset($eventData["AppData"]) ) {
+                                if ( preg_match("/CHRECFILE/",$eventData["AppData"])  ) {
+                                    $report["Event"] = "ChannelRecording";
+                                    $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                                    $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                                    $filename = explode("=",$eventData["AppData"]);
+                                    if ( isset( $filename[1] ) ) {
+                                        $report["Playback"] = $filename[1];
+                                        echo "\nChannelRecording : ($report[Playback]) " . curldo($report,0);
+                                        break;
+                                    }
+
+                                }
+                            }
+
+                            break;
+
+
+
+                        case "AgentCalled" :
+                            $report["Event"] = "AgentCalled";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            //$report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["DestUniqueid"])) ? $eventData["DestUniqueid"] : null;
+                            $report["Direction"] = "in";
+                            $report["Location"] = (isset($eventData["Queue"])) ? $eventData["Queue"] : null;
+                            $report["Number"] = ( isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                            $report["Agent"] = ( isset($eventData["MemberName"]) ) ? homeAgent($eventData["MemberName"]) : null;
+                            echo "\nAgentCalled : " . curldo($report,0);
+
+                            break;
+
+
+                        case "AgentConnect" :
+                            $report["Event"] = "AgentConnect";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            //$report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["DestUniqueid"])) ? $eventData["DestUniqueid"] : null;
+                            $report["Direction"] = "in";
+                            $report["Location"] = (isset($eventData["Queue"])) ? $eventData["Queue"] : null;
+                            $report["Number"] = ( isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                            $report["Agent"] = ( isset($eventData["MemberName"]) ) ? homeAgent($eventData["MemberName"]) : null;
+                            $report["Status"] = "ANSWERED";
+                            $report["RingTime"] = (isset($eventData["RingTime"])) ? $eventData["RingTime"] : null;
+                            $report["Holdtime"] = ( isset($eventData["HoldTime"]) ) ? $eventData["HoldTime"] : 0;
+                            echo "\nAgentConnect : " . curldo($report,0);
+
+                            break;
+
+                        case "AgentComplete" :
+
+                            $report["Event"] = "AgentComplete";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["DestUniqueid"])) ? $eventData["DestUniqueid"] : $report["Uniqueid"];
+                            $report["Direction"] = "in";
+                            $report["Location"] = (isset($eventData["Queue"])) ? $eventData["Queue"] : null;
+                            $report["Number"] = ( isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                            $report["Agent"] = ( isset($eventData["MemberName"]) ) ? homeAgent($eventData["MemberName"]) : null;
+                            $report["Agent"] = ( isset($eventData["ConnectedLineNum"]) ) ? $eventData["ConnectedLineNum"] : $report["Agent"];
+                            $report["Status"] = "ANSWERED";
+                            $report["Holdtime"] = ( isset($eventData["HoldTime"]) ) ? $eventData["HoldTime"] : 0;
+                            $report["TalkTime"] = ( isset($eventData["TalkTime"]) ) ? $eventData["TalkTime"] : 0;
+                            $report["Reason"] = ( isset($eventData["Reason"]) ) ? $eventData["Reason"] : null;
+                            echo "\nAgentComplete : " . curldo($report,0);
+
+
+                            break;
+
+                        case "AgentRingNoAnswer" :
+                            $report["Event"] = "AgentRingNoAnswer";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            //$report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["DestUniqueid"])) ? $eventData["DestUniqueid"] : null;
+                            $report["Direction"] = "in";
+                            $report["Location"] = (isset($eventData["Queue"])) ? $eventData["Queue"] : null;
+                            $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                            $report["Agent"] = ( isset($eventData["MemberName"]) ) ? homeAgent($eventData["MemberName"]) : null;
+                            $report["Status"] = "MISSED";
+                            $report["RingTime"] = (isset($eventData["RingTime"])) ? floor($eventData["RingTime"]/1000) : null;
+                            echo "\nAgentRingNoAnswer : " . curldo($report,0);
+
+                            break;
+
+
+                        case "AttendedTransfer" :
+
+                            $report["Event"] = "CallTransfer";
+                            $report["TransferType"] = "Attended";
+                            $report["Linkedid"] = (isset($eventData["OrigTransfererLinkedid"])) ? $eventData["OrigTransfererLinkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["OrigTransfererUniqueid"])) ? $eventData["OrigTransfererUniqueid"] : null;
+                            $report["Number"] = (isset($eventData["OrigTransfererConnectedLineNum"])) ? $eventData["OrigTransfererConnectedLineNum"] : null;
+                            $report["from"] = (isset($eventData["OrigTransfererCallerIDNum"])) ? $eventData["OrigTransfererCallerIDNum"] : null;
+
+                            if ( is_null($report["Uniqueid"]) ) {
+                                break;
+                            }
+
+                            echo "\nAttendedTransfer : " . curldo($report,0);
+
+                            break;
+
+
+                        case "BlindTransfer" :
+                            echo "\n " . json_encode($eventData);
+                            $report["Event"] = "CallTransfer";
+                            $report["TransferType"] = "Blind";
+                            $report["Linkedid"] = (isset($eventData["TransfererLinkedid"])) ? $eventData["TransfererLinkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["TransfererUniqueid"])) ? $eventData["TransfererUniqueid"] : null;
+                            $report["Number"] = (isset($eventData["TransfererConnectedLineNum"])) ? $eventData["TransfererConnectedLineNum"] : null;
+                            $report["from"] = (isset($eventData["TransfererCallerIDNum"])) ? $eventData["TransfererCallerIDNum"] : null;
+                            $report["to"] = (isset($eventData["Extension"])) ? $eventData["Extension"] : null;
+                            echo "\nBTransfer : " . curldo($report,0);
+
+                            break;
+
+                        case "Hangup" :
+                            //echo "\nHangup : " .json_encode($eventData);
+                            //break;
+                            $report["Event"] = "Hangup";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+
+                            if ( isset($eventData["Context"]) ) {
+                                if ( $eventData["Context"] == "ava-inbound" ) {
+                                    //echo "\n----- : " . json_encode($eventData);
+                                    // Incoming call ends in inbound
+                                    if ( isset($eventData["Exten"])) {
+                                        if ( $eventData["Exten"] == "h" ) {
+                                            $report["Event"] = "IncomingCallEnd";
+                                            $report["Direction"] = "in";
+                                            $report["Location"] = "Inbound";
+                                            $report["Status"] = "CANCEL";
+                                            $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                                            echo "\nIncomingCallEnds : " . curldo($report,0);
+                                            //echo "\nIncomingCallEnds : " . acurldo($report,0);
+                                            break;
+                                        } else {
+                                            // Outgoing call ended by callee
+                                            if ( isset($eventData["CallerIDNum"]) ) {
+                                                if ( preg_match("/unknown/",$eventData["CallerIDName"])  ) {
+                                                    $report["Event"] = "OutgoingCallEnd";
+                                                    $report["Direction"] = "out";
+                                                    $report["Location"] = "Outbound";
+                                                    $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                                                    $report["Agent"] = (isset($eventData["ConnectedLineNum"])) ? $eventData["ConnectedLineNum"] : null;
+                                                    echo "\nOutgoingCallEnd : " . curldo($report,0);
+                                                    //echo "\nOutgoingCallEnd : " . acurldo($report,0);
+                                                    break;
+                                                }
+                                            }
+
+                                        }
+                                    }
+
+                                }
+
+                                if ( $eventData["Context"] == "home-queues" ) {
+                                    // NO need to send it / we use QueueCallerAbandon or AgentComplete
+                                    break;
+                                    // Calls ended in queue
+                                    $report["Direction"] = "in";
+                                    $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                                    if ( isset($eventData["ConnectedLineNum"])) {
+                                        if ( preg_match("/unknown/",$eventData["ConnectedLineNum"])  ) {
+                                            $report["Agent"] = null;
+                                        }
+                                        else {
+                                            $report["Agent"] = $eventData["ConnectedLineNum"];
+                                        }
+                                    }
+                                    $report["Status"] = ( is_null($report["Agent"]) ) ? "NOANSWER" : "ANSWERED";
+                                    echo "\nHangup : " . curldo($report,0);
+                                    //echo "\nHangup : " . acurldo($report,0);
+                                    break;
+                                }
+
+                                // Outgoing call hangup by agent
+                                if ( $eventData["Context"] == "ava-outbound" ) {
+                                    //echo "\n" . json_encode($eventData);
+                                    if ( isset( $eventData["Exten"]) ) {
+                                        if (  $eventData["Exten"] == "h" ) {
+                                            if ( isset($eventData["ConnectedLineNum"]) ) {
+                                                if (  preg_match("/unknown/",$eventData["CallerIDName"]) ) {
+                                                    $report["Event"] = "OutgoingcallEnd";
+                                                    $report["Uniqueid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                                                    $report["Direction"] = "out";
+                                                    $report["Location"] = "outbound";
+                                                    $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                                                    $report["Agent"] = (isset($eventData["ConnectedLineNum"])) ? $eventData["ConnectedLineNum"] : null;
+                                                    echo "\nOutgoingCallEnd : " . curldo($report,0);
+                                                    //echo "\nOutgoingCallEnd : " . acurldo($report,0);
+                                                    break;
+                                                }
+                                            }
+
+                                        }
+                                    }
+                                }
+
+
+                            }
+                            //echo "\nHangup : " . json_encode($eventData);
+                            break;
+
+                        case "ExtensionStatus" :
+                            $report["Event"] = "ExtensionStatus";
+                            $report["Agent"] = (isset($eventData["Exten"])) ? $eventData["Exten"] : null;
+                            $report["Status"] = (isset($eventData["StatusText"])) ? $eventData["StatusText"] : null;
+                            echo "\nExtensionStatus : " . curldo($report,0);
+                            //echo "\nExtensionStatus : " . acurldo($report,0);
+                            break;
+
+
+                        case "DialBegin" :
+                            //echo "\nDialBegin : " . json_encode($eventData);
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+
+                            if ( isset($eventData["Context"]) ) {
+
+                                // Agent dial out
+                                if ( $eventData["Context"] ==  "ava-outbound" ) {
+                                    $report["Event"] = "NewOutgoingCall";
+                                    $report["Location"] = "outbound";
+                                    $report["Direction"] = "out";
+                                    $report["Status"] = "Ringing";
+                                    $report["Number"] = ( isset($eventData["Exten"]) ) ? $eventData["Exten"] : null;
+                                    $report["Agent"] = ( isset($eventData["CallerIDNum"]) ) ? $eventData["CallerIDNum"] : null;
+                                    echo "\nNewOutgoingCall : " . curldo($report,0);
+                                    //echo "\nNewOutgoingCall : " . acurldo($report,0);
+                                    break;
+                                }
+
+                                // NewCall made by web
+                                if ( $eventData["Context"] == "ava-newcall" ) {
+                                    //echo "\nDialBegin : " . json_encode($eventData);
+                                    $report["Event"] = "NewOutgoingCall";
+                                    $report["Location"] = "outbound";
+                                    $report["Direction"] = "out";
+                                    $report["Status"] = "Ringing";
+                                    $report["Number"] = ( isset($eventData["CallerIDNum"]) ) ? $eventData["CallerIDNum"] : null;
+                                    $report["Agent"] = ( isset($eventData["Exten"])) ? explode(",",$eventData["Exten"])[1] : null;
+                                    echo "\nNewOutgoingCall : " . curldo($report,0);
+                                    //echo "\nNewOutgoingCall : " . acurldo($report,0);
+                                    break;
+
+                                }
+
+                            }
+
+                            break;
+
+
+                        case "DialEnd" :
+
+                            //echo "\nDialEnd : " . json_encode($eventData);
+                            /*
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+
+                            if ( isset($eventData["Exten"]) ) {
+                                // Agent dial out ends
+
+
+                            }
+
+                            */
+
+                            break;
+
+                        //case "HangupRequest" :
+                        //    echo "\nHangupRequest : " . json_encode($eventData);
+                        //    break;
+                        case "BridgeEnter" :
+                            //echo "\nBridge enter : " . json_encode($eventData);
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+
+                            if ( isset($eventData["Context"]) ) {
+                                /* Outgoing call answered */
+                                if ( $eventData["Context"] == "ava-outbound" ) {
+                                    $report["Event"] = "OutgoingCallAnswered";
+                                    $report["Location"] = "outbound";
+                                    $report["Direction"] = "out";
+                                    $report["Status"] = "ANSWERED";
+                                    $report["Number"] = ( isset($eventData["Exten"]) ) ? $eventData["Exten"] : null;
+                                    $report["Agent"] = ( isset($eventData["CallerIDNum"]) ) ? $eventData["CallerIDNum"] : null;
+                                    echo "\nOutgoingCallAnswered : " . curldo($report,0);
+                                    //echo "\nOutgoingCallAnswered : " . acurldo($report,0);
+                                    break;
+                                }
+
+                            }
+
+                            break;
+
+
+                        case "DTMFEnd" :
+                            $report["Event"] = "SurveyResult";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+
+                            if ( isset( $eventData["Context"] ) ) {
+
+                                // Score submitted in Queue
+                                if ( $eventData["Context"] = "home-queues" ) {
+                                    $report["Direction"] = "in";
+                                    $report["Location"] = (isset($eventData["Exten"])) ? $eventData["Exten"] : null;
+                                    $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                                    $report["Agent"] = (isset($eventData["ConnectedLineNum"])) ? $eventData["ConnectedLineNum"] : null;
+                                    $report["Score"] = (isset($eventData["Digit"])) ? $eventData["Digit"] : null;
+                                    echo "\nSurveryResult : " . curldo($report,0);
+                                    //echo "\nSurveryResult : " . acurldo($report,0);
+                                    break;
+                                }
+
+                            }
+
+
+                            break;
+
+                        case "Newchannel" :
+                            //echo "\nNewChannel : " . json_encode($eventData);
+                            //break;
+                            $report["Event"] = "Newchannel";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Number"] = ( isset($eventData["CallerIDNum"])) ? artaNumberFormatter($eventData["CallerIDNum"]) : null;
+
+                            if ( isset($eventData["Context"]) ) {
+
+                                if ($eventData["Context"] == "ava-inbound"  ) {
+                                    if ( isset( $eventData["Exten"] ) ) {
+                                        // We do not walk in ava-inbound with s extension
+                                        if ( $eventData["Exten"] == "s" ) break;
+                                    }
+
+                                    // This هس where we actually have inbound calls
+                                    $report["Event"] = "NewIncomingCall";
+                                    $report["Location"] = "Inbound";
+                                    echo "\nNewIncomingCall : " . curldo($report,0);
+                                    //echo "\nNewIncomingCall : " . acurldo($report,0);
+                                    break;
+
+                                }
+
+                            }
+                            break;
+
+
+
+
+                        case "QueueCallerAbandon" :
+                            $report["Event"] = "QueueCallerAbandon";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Direction"] = "in";
+                            $report["Location"] = (isset($eventData["Queue"])) ? $eventData["Queue"] : null;
+                            $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                            $report["Holdtime"] = ( isset($eventData["HoldTime"]) ) ? $eventData["HoldTime"] : 0;
+                            $report["Position"] = (isset($eventData["Position"])) ? $eventData["Position"] : null;
+                            $report["OriginalPosition"] = (isset($eventData["OriginalPosition"])) ? $eventData["OriginalPosition"] : null;
+                            echo "\nQueueCallerAbandon  : " . curldo($report,0);
+                            //echo "\nQueueCallerAbandon  : " . acurldo($report,0);
+                            break;
+
+                        case "QueueCallerJoin" :
+                            $report["Event"] = "QueueCallerJoin";
+                            $report["Linkedid"] = (isset($eventData["Linkedid"])) ? $eventData["Linkedid"] : null;
+                            $report["Uniqueid"] = (isset($eventData["Uniqueid"])) ? $eventData["Uniqueid"] : null;
+                            $report["Number"] = (isset($eventData["CallerIDNum"])) ? $eventData["CallerIDNum"] : null;
+                            $report["Location"] = (isset($eventData["Queue"])) ? $eventData["Queue"] : null;
+                            $report["Position"] = (isset($eventData["Position"])) ? $eventData["Position"] : null;
+                            echo "\nQueueCallerJoin : " . curldo($report,0);
+                            //echo "\nQueueCallerJoin : " . acurldo($report,0);
+                            break;
+                        case "QueueCallerLeave" : break;
+                        case "QueueMemberPause" :
+                            //echo "\n" . json_encode($eventData);
+                            break;
+                        case "QueueMemberStatus" : break;
+                        default : break;
+
+                    }
+                }
+            }
+
+		}
+    }
+}
+
+
+
+function curldo($params , $post = false) {
+
+    //$url = "http://localhost:8060/ws/events";
+    $url = "http://10.97.65.171/gas/web/index.php/ws/incomecallevent";
+    $vars = "";
+    foreach($params as $k=>$v) {
+        $vars .= "$k=$v&";
+    }
+    $vars = substr($vars,0,-1);
+
+    $ch = curl_init();
+    if ( ! $post ) {
+        $url .= "?" . $vars;
+    }
+
+    //echo "$url\n";
+
+    curl_setopt($ch,CURLOPT_URL,$url);
+    curl_setopt($ch,CURLOPT_HEADER,0);
+    if ( $post ) {
+        curl_setopt($ch,CURLOPT_POST,1);
+        curl_setopt($ch,CURLOPT_POSTFIELDS,$vars);
+    }
+    curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,0);
+    curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,0);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER,1); // Return data instead of outputting
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,5);
+    curl_setopt($ch,CURLOPT_TIMEOUT,5);
+
+    $result = curl_exec($ch);
+    $http_status = (int) curl_getinfo($ch,CURLINFO_HTTP_CODE);
+    $curl_errno  = curl_errno($ch);
+    curl_close($ch);
+
+    if ( $http_status == 200) {
+
+        if ( $result == "1" ) {
+            return 1;
+        }
+    }
+    return 0;
+
+}
+
+
+function acurldo($params , $post = false) {
+    $url = "http://185.49.86.213/~gilannew/index.php/ws2/callevent";
+    $vars = "";
+    foreach($params as $k=>$v) {
+        $vars .= "$k=$v&";
+    }
+    $vars = substr($vars,0,-1);
+
+    $ch = curl_init();
+    if ( ! $post ) {
+        $url .= "?" . $vars;
+    }
+
+    curl_setopt($ch,CURLOPT_URL,$url);
+    curl_setopt($ch,CURLOPT_HEADER,0);
+    if ( $post ) {
+        curl_setopt($ch,CURLOPT_POST,1);
+        curl_setopt($ch,CURLOPT_POSTFIELDS,$vars);
+    }
+    curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,0);
+    curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,0);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER,1); // Return data instead of outputting
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,20);
+    curl_setopt($ch,CURLOPT_TIMEOUT,20);
+
+    $result = curl_exec($ch);
+    $http_status = (int) curl_getinfo($ch,CURLINFO_HTTP_CODE);
+    $curl_errno  = curl_errno($ch);
+    curl_close($ch);
+
+    echo "\n Http code : $http_status : Event($params[Event]) - acurldo";
+    if ( $http_status == 200) {
+
+        //if ( $result == "1" ) {
+        //    return 1;
+        //}
+        return 1;
+    }
+    return 0;
+
+}
+
+
+function zcurldo($params , $post = false) {
+    $url = "http://185.49.86.213/~gilannew/index.php/ws2/callevent2";
+    $vars = "";
+    foreach($params as $k=>$v) {
+        $vars .= "$k=$v&";
+    }
+    $vars = substr($vars,0,-1);
+
+    $ch = curl_init();
+    if ( ! $post ) {
+        $url .= "?" . $vars;
+    }
+
+    curl_setopt($ch,CURLOPT_URL,$url);
+    curl_setopt($ch,CURLOPT_HEADER,0);
+    if ( $post ) {
+        curl_setopt($ch,CURLOPT_POST,1);
+        curl_setopt($ch,CURLOPT_POSTFIELDS,$vars);
+    }
+    curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,0);
+    curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,0);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER,1); // Return data instead of outputting
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,20);
+    curl_setopt($ch,CURLOPT_TIMEOUT,20);
+
+    $result = curl_exec($ch);
+    $http_status = (int) curl_getinfo($ch,CURLINFO_HTTP_CODE);
+    $curl_errno  = curl_errno($ch);
+    curl_close($ch);
+
+    echo "\n Http code : $http_status : Event($params[Event]) - zcurldo";
+    if ( $http_status == 200) {
+
+        //if ( $result == "1" ) {
+        //    return 1;
+        //}
+        return 1;
+    }
+    return 0;
+
+}
+
+
+function rawToArray($eventData) {
+    $data = array();
+    $events = preg_split("/\r\n/",$eventData,-1,PREG_SPLIT_NO_EMPTY);
+    if ( count($events) < 1 ) {
+        return false;
+    }
+
+    foreach($events as $event) {
+        $exp = explode(":",$event);
+        if ( count($exp) == 2 ) {
+            $data[trim($exp[0])] = trim($exp[1]);
+        }
+    }
+
+    return $data;
+}
+
+
+function homeAgent($member) {
+    if ( preg_match("/@/",$member) ) {
+        if ( preg_match("/\//",$member) ) {
+            $agent = explode("@",$member);
+            if ( isset($agent[0]) ) {
+                $agent = explode("/",$agent[0]);
+                if ( isset($agent[1]) ) {
+                    return $agent[1];
+                }
+            }
+        }
+    }
+    return null;
+}
+
+
+function artaNumberFormatter($number) {
+        if ( $number == "00000000" ) {
+            return $number;
+        }
+
+        if ( strlen($number) > 11 ) {
+            return $number;
+        }
+
+        if ( strlen($number) == 11 ) {
+            // Return as-is
+            return $number;
+        }
+
+        if ( strlen($number) == 10 ) {
+            return "0" . $number;
+        }
+
+        if ( strlen($number) < 10 ) {
+            return $number;
+        }
+
+        return $number;
+
+    }

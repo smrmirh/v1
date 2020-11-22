@@ -1,0 +1,18 @@
+[Unit]
+Description=Alopad stats service
+After=asterisk.service
+
+
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=0
+User=root
+ExecStart=/usr/bin/env php /usr/share/alopad/run/alostats
+
+
+[Install]
+WantedBy=multi-user.target

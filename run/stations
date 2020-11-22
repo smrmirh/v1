@@ -1,0 +1,1 @@
+{"result":true,"stations":{"S0001":{"available":true,"ip":"10.97.64.74","type":"SIP"},"S0002":{"available":false,"ip":"-none-","type":"SIP"},"S0003":{"available":false,"ip":"-none-","type":"SIP"}}}

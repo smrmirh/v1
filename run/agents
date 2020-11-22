@@ -1,0 +1,6 @@
+string(67) "Event: FullyBooted
+Privilege: system,all
+Status: Fully Booted
+
+"
+{"result":true,"agents":{"30":{"plugged":false,"station":"","logged":false,"logged_count":0,"queues":false},"327":{"plugged":false,"station":"","logged":false,"logged_count":0,"queues":false},"329":{"plugged":true,"station":"S0001","logged":false,"logged_count":0,"queues":false}}}
