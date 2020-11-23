@@ -1,0 +1,17 @@
+<div>
+<div class="modal-header">
+    <h5>Done</h5>
+</div>
+<div class="modal-body">
+    <h5>Result : {{$pop.contents.result}}</h5>
+    <p>
+        {{$pop.contents.message}}
+    </p>
+    <input type="text" ng-model="$pop.name">
+</div>
+<div class="modal-footer">
+    <button class="btn btn-outline-primary" ng-click="$pop.ok()">OK</button>
+    <button class="btn btn-warning" ng-click="$pop.cancel()">Cancel</button>
+</div>
+</div>
+
